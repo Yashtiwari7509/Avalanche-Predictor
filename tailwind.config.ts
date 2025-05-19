@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,6 +62,26 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				// Custom snow colors
+				snow: {
+					'50': '#f8fafc',
+					'100': '#eef2f7',
+					'200': '#e2e8f0',
+					'300': '#cbd5e1',
+					'400': '#94a3b8',
+					'500': '#64748b',
+					'600': '#475569',
+					'700': '#334155',
+					'800': '#1e293b',
+					'900': '#0f172a',
+				},
+				risk: {
+					'low': '#10b981',
+					'moderate': '#f59e0b',
+					'considerable': '#f97316',
+					'high': '#ef4444',
+					'extreme': '#7f1d1d'
 				}
 			},
 			borderRadius: {
@@ -84,11 +105,27 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				'snow-fall': {
+					'0%': {
+						transform: 'translateY(0) translateX(0)',
+						opacity: '0'
+					},
+					'10%': {
+						opacity: '1'
+					},
+					'100%': {
+						transform: 'translateY(100vh) translateX(20px)',
+						opacity: '0.2'
+					}
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'snow-fall-slow': 'snow-fall 15s linear infinite',
+				'snow-fall-medium': 'snow-fall 10s linear infinite',
+				'snow-fall-fast': 'snow-fall 7s linear infinite'
 			}
 		}
 	},
