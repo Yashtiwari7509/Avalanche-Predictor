@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -32,7 +31,7 @@ const Index = () => {
     queryKey: ['prediction', selectedLocation],
     queryFn: () => selectedLocation ? fetchPrediction(selectedLocation) : null,
     enabled: !!selectedLocation,
-    onSettled: (data) => {
+    onSuccess: (data) => {
       if (data) {
         setPrediction(data);
         toast.success("Avalanche prediction loaded", {
@@ -40,12 +39,10 @@ const Index = () => {
         });
       }
     },
-    meta: {
-      onError: () => {
-        toast.error("Failed to load prediction", {
-          description: "There was an error retrieving the avalanche prediction data."
-        });
-      }
+    onError: () => {
+      toast.error("Failed to load prediction", {
+        description: "There was an error retrieving the avalanche prediction data."
+      });
     }
   });
 
