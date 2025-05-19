@@ -1,162 +1,381 @@
 
-import { AvalanchePrediction, AvalancheFormData, Location } from "../types/avalanche";
+import { AvalanchePrediction, AvalancheFormData, Location, RiskLevel } from "../types/avalanche";
 
-// Mock data for demonstration purposes
-// In a real app, this would be replaced with actual API calls
-const LOCATIONS: Location[] = [
-  { id: "1", name: "Whistler", region: "British Columbia", country: "Canada" },
-  { id: "2", name: "Chamonix", region: "Mont Blanc", country: "France" },
-  { id: "3", name: "Verbier", region: "Valais", country: "Switzerland" },
-  { id: "4", name: "Jackson Hole", region: "Wyoming", country: "USA" },
-  { id: "5", name: "Niseko", region: "Hokkaido", country: "Japan" }
-];
+// Using the NWAC (Northwest Avalanche Center) API as one of our data sources
+// We will also use the Swiss SLF and European EAWS data when available
+const API_BASE_URL = "https://api.avalanche.org/v2";
 
-const MOCK_PREDICTIONS: Record<string, AvalanchePrediction> = {
-  "1": {
-    location: LOCATIONS[0],
-    date: new Date().toISOString(),
-    riskLevel: "moderate",
-    weatherCondition: {
-      temperature: -5,
-      precipitation: 2.5,
-      windSpeed: 30,
-      windDirection: "NW",
-      visibility: "Good",
-      forecast: "Light snowfall expected in the next 24 hours"
-    },
-    snowpack: {
-      depth: 200,
-      newSnow24h: 15,
-      newSnow48h: 25,
-      newSnow7d: 45,
-      snowpackStability: "Moderate",
-      weakLayers: true
-    },
-    terrainFactors: {
-      elevation: 2200,
-      slope: 35,
-      aspect: "N",
-      treeLineLevel: "near",
-      vegetation: "Sparse"
-    },
-    warningDetails: "Recent wind loading on north-facing slopes has created potential slab formation. Use caution above 2000m on steep north aspects.",
-    safetyRecommendations: [
-      "Avoid steep north-facing slopes above 2000m",
-      "Watch for signs of wind-loading",
-      "Perform stability tests before committing to steep terrain",
-      "Travel one-at-a-time in risky areas",
-      "Maintain safe spacing when ascending or descending"
-    ],
-    validityPeriod: "November 10, 2025 - November 11, 2025",
-    history: [
-      {
-        date: "2025-11-09",
-        location: "Whistler West Bowl",
-        riskLevel: "moderate",
-        details: "Small slab avalanche triggered by skier, no injuries"
-      },
-      {
-        date: "2025-11-07",
-        location: "Whistler Symphony Bowl",
-        riskLevel: "low",
-        details: "No significant activity reported"
-      }
-    ]
+export const fetchLocations = async (): Promise<Location[]> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/public/products/map-layer`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch locations');
+    }
+    
+    const data = await response.json();
+    
+    // Transform the API response to match our Location interface
+    return data.features.map((feature: any) => ({
+      id: feature.id || String(feature.properties.id),
+      name: feature.properties.name,
+      region: feature.properties.center_name || feature.properties.state,
+      country: "USA" // Most data from this API is US-based
+    }));
+  } catch (error) {
+    console.error("Error fetching locations:", error);
+    // Return some fallback locations in case the API fails
+    return [
+      { id: "NWAC", name: "Washington", region: "Pacific Northwest", country: "USA" },
+      { id: "CAIC", name: "Colorado", region: "Rocky Mountains", country: "USA" },
+      { id: "CBAC", name: "Crested Butte", region: "Colorado", country: "USA" },
+      { id: "FAC", name: "Flathead", region: "Montana", country: "USA" },
+      { id: "GNFAC", name: "Gallatin", region: "Montana", country: "USA" }
+    ];
   }
 };
 
-// In a real app, this would be an actual API call
-export const fetchLocations = async (): Promise<Location[]> => {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve(LOCATIONS), 500);
-  });
-};
-
 export const fetchPrediction = async (locationId: string): Promise<AvalanchePrediction | null> => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      if (MOCK_PREDICTIONS[locationId]) {
-        resolve(MOCK_PREDICTIONS[locationId]);
-      } else {
-        // In case we don't have mock data for this location, create some based on the first item
-        const basePrediction = {...MOCK_PREDICTIONS["1"]};
-        const location = LOCATIONS.find(loc => loc.id === locationId);
-        
-        if (location) {
-          basePrediction.location = location;
-          resolve(basePrediction);
-        } else {
-          resolve(null);
-        }
-      }
-    }, 1000);
-  });
+  try {
+    // First fetch the forecast for the selected location
+    const response = await fetch(`${API_BASE_URL}/public/product/${locationId}`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch prediction');
+    }
+    
+    const data = await response.json();
+    
+    // Find the location details
+    const locationsResponse = await fetch(`${API_BASE_URL}/public/products/map-layer`);
+    const locationsData = await locationsResponse.json();
+    const locationFeature = locationsData.features.find((feature: any) => 
+      feature.id === locationId || String(feature.properties.id) === locationId
+    );
+    
+    if (!locationFeature) {
+      throw new Error('Location not found');
+    }
+    
+    // Transform the API response to our AvalanchePrediction interface
+    const location: Location = {
+      id: locationId,
+      name: locationFeature.properties.name,
+      region: locationFeature.properties.center_name || locationFeature.properties.state,
+      country: "USA"
+    };
+
+    // Parse the forecast data
+    const forecastData = data.product?.forecast?.avalanche_forecast;
+    if (!forecastData) {
+      throw new Error('No forecast data available');
+    }
+
+    // Parse danger levels
+    const dangerLevel = determineDangerLevel(forecastData);
+    
+    // Extract weather data from forecast
+    const weatherData = forecastData.weather?.data?.[0] || {};
+    
+    // Extract avalanche problems
+    const avalancheProblems = forecastData.avalanche_problems || [];
+
+    // Transform to our prediction model
+    const prediction: AvalanchePrediction = {
+      location,
+      date: new Date().toISOString(),
+      riskLevel: mapDangerToRisk(dangerLevel),
+      weatherCondition: {
+        temperature: extractTemperature(weatherData),
+        precipitation: extractPrecipitation(weatherData),
+        windSpeed: extractWindSpeed(weatherData),
+        windDirection: extractWindDirection(weatherData),
+        visibility: "Variable", // Often not directly provided by APIs
+        forecast: extractForecastSummary(weatherData, forecastData)
+      },
+      snowpack: {
+        depth: extractSnowDepth(forecastData),
+        newSnow24h: extractNewSnow(forecastData, 24),
+        newSnow48h: extractNewSnow(forecastData, 48),
+        newSnow7d: extractNewSnow(forecastData, 168), // 7 days in hours
+        snowpackStability: extractSnowpackStability(forecastData, avalancheProblems),
+        weakLayers: determineWeakLayers(avalancheProblems)
+      },
+      terrainFactors: {
+        elevation: extractElevation(forecastData),
+        slope: 30, // Default, usually not specified in forecasts
+        aspect: extractAspect(avalancheProblems),
+        treeLineLevel: "variable", // Not always available in forecasts
+        vegetation: "Variable" // Not always specified
+      },
+      warningDetails: extractWarningDetails(forecastData),
+      safetyRecommendations: extractSafetyRecommendations(forecastData, dangerLevel),
+      validityPeriod: extractValidityPeriod(forecastData),
+      history: [] // Historical data typically requires separate API calls
+    };
+    
+    return prediction;
+  } catch (error) {
+    console.error("Error fetching prediction:", error);
+    return null;
+  }
 };
 
-// Simulate API call with form data
 export const getPredictionFromInputs = async (formData: AvalancheFormData): Promise<AvalanchePrediction | null> => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const location = LOCATIONS.find(loc => loc.id === formData.locationId);
-      if (!location) {
-        resolve(null);
-        return;
-      }
-
-      // In a real app, this would use the form data to calculate risk
-      // This is just a simple simulation based on some of the input values
-      let riskLevel: "low" | "moderate" | "considerable" | "high" | "extreme" = "low";
-      
-      // Very simplistic risk calculation - in real life this would be much more complex
-      if (formData.newSnow24h > 30 || formData.slope > 35 || formData.windSpeed > 40) {
-        riskLevel = "extreme";
-      } else if (formData.newSnow24h > 20 || formData.slope > 30 || formData.windSpeed > 30) {
-        riskLevel = "high";
-      } else if (formData.newSnow24h > 10 || formData.slope > 25 || formData.windSpeed > 20) {
-        riskLevel = "considerable";
-      } else if (formData.newSnow24h > 5 || formData.slope > 20 || formData.windSpeed > 10) {
-        riskLevel = "moderate";
-      }
-
-      const prediction: AvalanchePrediction = {
-        location,
-        date: new Date().toISOString(),
-        riskLevel,
-        weatherCondition: {
-          temperature: formData.temperature,
-          precipitation: formData.newSnow24h * 0.1, // Just a rough conversion for demo
-          windSpeed: formData.windSpeed,
-          windDirection: "Variable",
-          visibility: formData.visibility,
-          forecast: "Generated based on your inputs"
-        },
-        snowpack: {
-          depth: 100 + formData.newSnow24h + formData.newSnow48h,
-          newSnow24h: formData.newSnow24h,
-          newSnow48h: formData.newSnow48h,
-          newSnow7d: formData.newSnow48h + formData.newSnow24h + 10, // Just for demo
-          snowpackStability: riskLevel === "low" ? "Good" : riskLevel === "moderate" ? "Moderate" : "Poor",
-          weakLayers: riskLevel !== "low"
-        },
-        terrainFactors: {
-          elevation: formData.elevation,
-          slope: formData.slope,
-          aspect: formData.aspect,
-          treeLineLevel: formData.treeLineLevel,
-          vegetation: "Unknown"
-        },
-        warningDetails: generateWarningDetails(riskLevel, formData),
-        safetyRecommendations: generateSafetyRecommendations(riskLevel),
-        validityPeriod: `${new Date().toDateString()} - ${new Date(new Date().getTime() + 86400000).toDateString()}`,
-        history: []
-      };
-      
-      resolve(prediction);
-    }, 1500);
-  });
+  try {
+    // First get the base prediction for the location
+    const basePrediction = await fetchPrediction(formData.locationId);
+    
+    if (!basePrediction) {
+      throw new Error('Failed to get base prediction');
+    }
+    
+    // Enhance the prediction with user input data
+    // This is where we would typically call a machine learning model or risk assessment API
+    // For now, we'll simulate this by adjusting the risk level based on input parameters
+    
+    // Calculate modified risk level based on submitted parameters
+    const riskLevel = calculateRiskFromInputs(formData, basePrediction.riskLevel);
+    
+    // Create an enhanced prediction with user inputs
+    const enhancedPrediction: AvalanchePrediction = {
+      ...basePrediction,
+      riskLevel,
+      weatherCondition: {
+        ...basePrediction.weatherCondition,
+        temperature: formData.temperature,
+        windSpeed: formData.windSpeed,
+        visibility: formData.visibility
+      },
+      snowpack: {
+        ...basePrediction.snowpack,
+        newSnow24h: formData.newSnow24h,
+        newSnow48h: formData.newSnow48h,
+      },
+      terrainFactors: {
+        ...basePrediction.terrainFactors,
+        elevation: formData.elevation,
+        slope: formData.slope,
+        aspect: formData.aspect,
+        treeLineLevel: formData.treeLineLevel
+      },
+      // Update warning details and safety recommendations based on new risk level
+      warningDetails: generateWarningDetails(riskLevel, formData),
+      safetyRecommendations: generateSafetyRecommendations(riskLevel)
+    };
+    
+    return enhancedPrediction;
+  } catch (error) {
+    console.error("Error generating prediction from inputs:", error);
+    return null;
+  }
 };
 
-function generateWarningDetails(riskLevel: "low" | "moderate" | "considerable" | "high" | "extreme", formData: AvalancheFormData): string {
+// Helper functions to parse and transform API data
+
+function mapDangerToRisk(dangerLevel: number): RiskLevel {
+  // Convert NWAC danger levels (1-5) to our risk levels
+  switch (dangerLevel) {
+    case 1: return "low";
+    case 2: return "moderate";
+    case 3: return "considerable";
+    case 4: return "high";
+    case 5: return "extreme";
+    default: return "moderate";
+  }
+}
+
+function determineDangerLevel(forecastData: any): number {
+  // Extract danger ratings from forecast data
+  const dangerRatings = forecastData.danger_ratings || [];
+  
+  if (!dangerRatings.length) return 2; // Default to moderate if no data
+  
+  // Get the highest danger rating for any elevation
+  let highestDanger = 1;
+  dangerRatings.forEach((rating: any) => {
+    Object.values(rating.ratings || {}).forEach((value: any) => {
+      const dangerValue = Number(value);
+      if (dangerValue > highestDanger) {
+        highestDanger = dangerValue;
+      }
+    });
+  });
+  
+  return highestDanger;
+}
+
+function extractTemperature(weatherData: any): number {
+  // Extract temperature from weather data
+  return weatherData.temp_max || weatherData.temp_mid || weatherData.temp_min || -5;
+}
+
+function extractPrecipitation(weatherData: any): number {
+  // Extract precipitation from weather data
+  return weatherData.precip || weatherData.snow_water_equiv || 0;
+}
+
+function extractWindSpeed(weatherData: any): number {
+  // Extract wind speed from weather data
+  return weatherData.wind_speed || weatherData.wind_gust || 0;
+}
+
+function extractWindDirection(weatherData: any): string {
+  // Extract wind direction from weather data
+  return weatherData.wind_dir || "Variable";
+}
+
+function extractForecastSummary(weatherData: any, forecastData: any): string {
+  // Extract forecast summary
+  return forecastData.bottom_line || weatherData.weather || "No forecast available";
+}
+
+function extractSnowDepth(forecastData: any): number {
+  // Extract snow depth
+  return forecastData.snow_depth || forecastData.snow_height || 100;
+}
+
+function extractNewSnow(forecastData: any, hours: number): number {
+  // Extract new snow over time period
+  const snowData = forecastData.snow_data || {};
+  if (hours === 24) return snowData.snow_24 || 0;
+  if (hours === 48) return snowData.snow_48 || 0;
+  if (hours === 168) return snowData.snow_7days || 0;
+  return 0;
+}
+
+function extractSnowpackStability(forecastData: any, problems: any[]): string {
+  // Determine snowpack stability based on forecast and problems
+  if (problems.length > 2) return "Poor";
+  if (problems.length > 0) return "Moderate";
+  return "Good";
+}
+
+function determineWeakLayers(problems: any[]): boolean {
+  // Check if weak layers are mentioned in avalanche problems
+  for (const problem of problems) {
+    const problemType = problem.type?.toLowerCase() || '';
+    if (
+      problemType.includes('persistent') || 
+      problemType.includes('deep') || 
+      problemType.includes('weak')
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function extractElevation(forecastData: any): number {
+  // Extract elevation data, default to mid-mountain
+  return forecastData.elevation_mid || 2000;
+}
+
+function extractAspect(problems: any[]): string {
+  // Determine most concerning aspect from problems
+  if (!problems.length) return "N";
+  
+  const aspectCounts: Record<string, number> = { N: 0, NE: 0, E: 0, SE: 0, S: 0, SW: 0, W: 0, NW: 0 };
+  
+  problems.forEach((problem: any) => {
+    const aspects = problem.aspects || [];
+    aspects.forEach((aspect: string) => {
+      if (aspectCounts[aspect] !== undefined) {
+        aspectCounts[aspect]++;
+      }
+    });
+  });
+  
+  // Return the aspect with highest count
+  let maxCount = 0;
+  let maxAspect = "N";
+  
+  Object.entries(aspectCounts).forEach(([aspect, count]) => {
+    if (count > maxCount) {
+      maxCount = count;
+      maxAspect = aspect;
+    }
+  });
+  
+  return maxAspect;
+}
+
+function extractWarningDetails(forecastData: any): string {
+  // Extract warning details from forecast
+  return forecastData.bottom_line || 
+         forecastData.highlights || 
+         "Check local forecast for detailed avalanche warnings.";
+}
+
+function extractSafetyRecommendations(forecastData: any, dangerLevel: number): string[] {
+  // Base recommendations
+  const commonRecs = [
+    "Carry avalanche safety equipment (beacon, shovel, probe)",
+    "Never travel alone in avalanche terrain",
+    "Check the latest avalanche bulletin before heading out"
+  ];
+  
+  // Add recommendations based on danger level
+  const levelRecs = generateSafetyRecommendations(mapDangerToRisk(dangerLevel));
+  
+  // Add any specific recommendations from forecast
+  const forecastRecs = [];
+  if (forecastData.travel_advice) {
+    forecastRecs.push(forecastData.travel_advice);
+  }
+  
+  // Combine and deduplicate
+  return [...new Set([...levelRecs, ...forecastRecs, ...commonRecs])];
+}
+
+function extractValidityPeriod(forecastData: any): string {
+  // Extract validity period from forecast
+  const startDate = forecastData.published_time ? new Date(forecastData.published_time) : new Date();
+  const endDate = forecastData.expires_time ? new Date(forecastData.expires_time) : new Date(startDate.getTime() + 86400000);
+  
+  return `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
+}
+
+function calculateRiskFromInputs(formData: AvalancheFormData, baseRisk: RiskLevel): RiskLevel {
+  // Calculate risk based on a combination of base risk and user inputs
+  // This would ideally use a proper risk model
+  
+  let riskScore = 0;
+  
+  // Base risk level contributes points
+  switch (baseRisk) {
+    case "low": riskScore += 1; break;
+    case "moderate": riskScore += 2; break;
+    case "considerable": riskScore += 3; break;
+    case "high": riskScore += 4; break;
+    case "extreme": riskScore += 5; break;
+  }
+  
+  // New snow adds risk
+  if (formData.newSnow24h > 30) riskScore += 3;
+  else if (formData.newSnow24h > 20) riskScore += 2;
+  else if (formData.newSnow24h > 10) riskScore += 1;
+  
+  // Steep slopes add risk
+  if (formData.slope > 35) riskScore += 2;
+  else if (formData.slope > 30) riskScore += 1;
+  
+  // High wind adds risk
+  if (formData.windSpeed > 40) riskScore += 2;
+  else if (formData.windSpeed > 20) riskScore += 1;
+  
+  // Temperature near freezing can add risk (wet avalanches)
+  if (formData.temperature > -2 && formData.temperature < 2) riskScore += 1;
+  
+  // Map score back to risk level
+  if (riskScore >= 8) return "extreme";
+  if (riskScore >= 6) return "high";
+  if (riskScore >= 4) return "considerable";
+  if (riskScore >= 2) return "moderate";
+  return "low";
+}
+
+function generateWarningDetails(riskLevel: RiskLevel, formData: AvalancheFormData): string {
   switch(riskLevel) {
     case "extreme":
       return "EXTREME DANGER: Natural and human-triggered avalanches are certain. Avoid all avalanche terrain.";
@@ -171,7 +390,7 @@ function generateWarningDetails(riskLevel: "low" | "moderate" | "considerable" |
   }
 }
 
-function generateSafetyRecommendations(riskLevel: "low" | "moderate" | "considerable" | "high" | "extreme"): string[] {
+function generateSafetyRecommendations(riskLevel: RiskLevel): string[] {
   const common = [
     "Carry avalanche safety equipment (beacon, shovel, probe)",
     "Never travel alone in avalanche terrain",
@@ -217,3 +436,4 @@ function generateSafetyRecommendations(riskLevel: "low" | "moderate" | "consider
       ];
   }
 }
+

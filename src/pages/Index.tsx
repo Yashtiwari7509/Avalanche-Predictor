@@ -32,7 +32,7 @@ const Index = () => {
     queryKey: ['prediction', selectedLocation],
     queryFn: () => selectedLocation ? fetchPrediction(selectedLocation) : null,
     enabled: !!selectedLocation,
-    onSuccess: (data) => {
+    onSettled: (data) => {
       if (data) {
         setPrediction(data);
         toast.success("Avalanche prediction loaded", {
@@ -40,10 +40,12 @@ const Index = () => {
         });
       }
     },
-    onError: () => {
-      toast.error("Failed to load prediction", {
-        description: "There was an error retrieving the avalanche prediction data."
-      });
+    meta: {
+      onError: () => {
+        toast.error("Failed to load prediction", {
+          description: "There was an error retrieving the avalanche prediction data."
+        });
+      }
     }
   });
 
@@ -97,11 +99,11 @@ const Index = () => {
               <PredictionForm 
                 locations={locations} 
                 onSubmit={handleCustomPrediction} 
-                isLoading={isCustomPredicting}
+                isLoading={isCustomPredicting || isLoadingLocations}
               />
               
               {/* Show skeleton while loading */}
-              {isCustomPredicting && (
+              {(isCustomPredicting || isLoadingPrediction) && (
                 <Card>
                   <CardContent className="p-6">
                     <div className="space-y-4">
@@ -124,7 +126,7 @@ const Index = () => {
               )}
               
               {/* Show prediction results */}
-              {!isCustomPredicting && prediction && (
+              {!isCustomPredicting && !isLoadingPrediction && prediction && (
                 <PredictionResult prediction={prediction} />
               )}
             </TabsContent>
@@ -138,8 +140,8 @@ const Index = () => {
 
       <footer className="bg-snow-200 py-4 mt-12 relative z-10">
         <div className="container mx-auto text-center text-snow-600 text-sm">
-          <p>Avalanche Risk Predictor — For educational purposes only.</p>
-          <p className="mt-1">Always check official avalanche forecasts before heading into the backcountry.</p>
+          <p>Avalanche Risk Predictor — Always verify with official forecasts.</p>
+          <p className="mt-1">Data provided by avalanche.org and regional forecast centers.</p>
         </div>
       </footer>
     </div>
