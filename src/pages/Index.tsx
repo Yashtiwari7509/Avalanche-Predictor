@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { PredictionForm } from '@/components/PredictionForm';
 import { PredictionResult } from '@/components/PredictionResult';
 import { InfoSection } from '@/components/InfoSection';
 import { SnowBackground } from '@/components/SnowBackground';
+import { AudioEffects } from '@/components/AudioEffects';
 import { toast } from 'sonner';
 import { CloudSnow, MountainSnow, Wind } from 'lucide-react';
 
@@ -17,6 +18,7 @@ const Index = () => {
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [prediction, setPrediction] = useState<AvalanchePrediction | null>(null);
   const [isCustomPredicting, setIsCustomPredicting] = useState(false);
+  const [snowIntensity, setSnowIntensity] = useState<'light' | 'medium' | 'heavy'>('medium');
 
   // Fetch available locations
   const { data: locations = [], isLoading: isLoadingLocations } = useQuery({
@@ -33,20 +35,32 @@ const Index = () => {
     queryKey: ['prediction', selectedLocation],
     queryFn: () => selectedLocation ? fetchPrediction(selectedLocation) : null,
     enabled: !!selectedLocation,
-    onSuccess: (data) => {
-      if (data) {
-        setPrediction(data);
-        toast.success("Avalanche prediction loaded", {
-          description: `Prediction data for ${data.location.name} is now available.`,
+    meta: {
+      onSuccess: (data: AvalanchePrediction | null) => {
+        if (data) {
+          setPrediction(data);
+          
+          // Set snow intensity based on risk level
+          if (data.riskLevel === 'high' || data.riskLevel === 'extreme') {
+            setSnowIntensity('heavy');
+          } else if (data.riskLevel === 'considerable') {
+            setSnowIntensity('medium');
+          } else {
+            setSnowIntensity('light');
+          }
+          
+          toast.success("Avalanche prediction loaded", {
+            description: `Prediction data for ${data.location.name} is now available.`,
+            icon: <CloudSnow className="h-4 w-4" />
+          });
+        }
+      },
+      onError: () => {
+        toast.error("Failed to load prediction", {
+          description: "There was an error retrieving the avalanche prediction data.",
           icon: <CloudSnow className="h-4 w-4" />
         });
       }
-    },
-    onError: () => {
-      toast.error("Failed to load prediction", {
-        description: "There was an error retrieving the avalanche prediction data.",
-        icon: <CloudSnow className="h-4 w-4" />
-      });
     }
   });
 
@@ -62,6 +76,16 @@ const Index = () => {
       const result = await getPredictionFromInputs(formData);
       if (result) {
         setPrediction(result);
+        
+        // Set snow intensity based on risk level
+        if (result.riskLevel === 'high' || result.riskLevel === 'extreme') {
+          setSnowIntensity('heavy');
+        } else if (result.riskLevel === 'considerable') {
+          setSnowIntensity('medium');
+        } else {
+          setSnowIntensity('light');
+        }
+        
         toast.success("Avalanche risk analyzed", {
           description: `Based on your inputs, the risk level is ${result.riskLevel.toUpperCase()}.`,
           icon: <MountainSnow className="h-4 w-4" />
@@ -80,7 +104,13 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-snow-100 to-snow-200 relative">
       {/* Snow effect background */}
-      <SnowBackground intensity="medium" />
+      <SnowBackground intensity={snowIntensity} />
+      
+      {/* Audio effects */}
+      <AudioEffects 
+        riskLevel={prediction?.riskLevel} 
+        snowIntensity={snowIntensity} 
+      />
       
       <div className="container mx-auto py-8 px-4 relative z-10">
         <header className="text-center mb-10 relative">
