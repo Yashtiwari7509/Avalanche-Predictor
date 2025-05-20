@@ -36,8 +36,8 @@ export const PredictionResult: React.FC<PredictionResultProps> = ({ prediction }
   // Background color based on risk level
   const getBgColor = () => {
     switch (riskLevel) {
-      case 'low': return 'bg-green-50';
-      case 'moderate': return 'bg-amber-50';
+      case 'low': return 'bg-sky-200';
+      case 'moderate': return 'bg-yellow-50';
       case 'considerable': return 'bg-orange-50';
       case 'high': return 'bg-red-50';
       case 'extreme': return 'bg-red-100';

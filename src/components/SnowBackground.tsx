@@ -1,5 +1,4 @@
-
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useMemo, useEffect, useState } from "react";
 
 interface SnowflakeProps {
   left: string;
@@ -10,96 +9,108 @@ interface SnowflakeProps {
   blur?: string;
 }
 
-const Snowflake: React.FC<SnowflakeProps> = ({ left, size, opacity, delay, duration, blur }) => {
+const Snowflake: React.FC<SnowflakeProps> = ({
+  left,
+  size,
+  opacity,
+  delay,
+  duration,
+  blur,
+}) => {
   return (
-    <div 
-      className={`absolute top-0 z-0 rounded-full bg-white ${duration}`}
-      style={{ 
-        left, 
-        width: size, 
-        height: size, 
-        opacity, 
+    <div
+      className={`absolute top-[-10%] ${duration} animate-snow-drift rounded-full bg-white pointer-events-none`}
+      style={{
+        left,
+        width: size,
+        height: size,
+        opacity,
         animationDelay: delay,
-        filter: blur ? `blur(${blur})` : 'none'
+        filter: blur ? `blur(${blur})` : "none",
       }}
     />
   );
 };
 
 interface SnowBackgroundProps {
-  intensity?: 'light' | 'medium' | 'heavy';
+  intensity?: "light" | "medium" | "heavy";
 }
 
-export const SnowBackground: React.FC<SnowBackgroundProps> = ({ intensity = 'medium' }) => {
-  const [isMoving, setIsMoving] = useState(false);
-  
-  // Trigger movement effect on mount and periodically
-  useEffect(() => {
-    setIsMoving(true);
-    const interval = setInterval(() => {
-      setIsMoving(prev => !prev);
-      setTimeout(() => setIsMoving(true), 100);
-    }, 12000);
-    
-    return () => clearInterval(interval);
-  }, []);
-  
-  const snowflakeCount = intensity === 'light' ? 30 : intensity === 'medium' ? 60 : 100;
-  
-  const snowflakes = useMemo(() => {
-    return Array.from({ length: snowflakeCount }).map((_, i) => ({
-      id: i,
-      left: `${Math.random() * 100}%`,
-      size: `${Math.random() * 10 + 2}px`,
-      opacity: `${Math.random() * 0.7 + 0.2}`,
-      delay: `${Math.random() * 20}s`,
-      duration: [
-        'animate-snow-fall-slow',
-        'animate-snow-fall-medium',
-        'animate-snow-fall-fast'
-      ][Math.floor(Math.random() * 3)],
-      blur: Math.random() > 0.7 ? `${Math.random() * 2}px` : undefined
-    }));
-  }, [snowflakeCount, isMoving]);
+export const SnowBackground: React.FC<SnowBackgroundProps> = ({
+  intensity = "medium",
+}) => {
+  const snowflakeCount =
+    intensity === "light" ? 30 : intensity === "medium" ? 60 : 100;
 
-  // Create some larger, blurred background snowflakes for depth
-  const backgroundSnowflakes = useMemo(() => {
-    return Array.from({ length: Math.floor(snowflakeCount / 3) }).map((_, i) => ({
-      id: i + 1000, // Ensure unique IDs
+  const generateSnowflakes = (
+    count: number,
+    speedClass: string,
+    sizeRange: [number, number],
+    opacityRange: [number, number],
+    blurChance = 0.5
+  ) =>
+    Array.from({ length: count }).map((_, i) => ({
+      id: i + Math.random(),
       left: `${Math.random() * 100}%`,
-      size: `${Math.random() * 25 + 15}px`,
-      opacity: `${Math.random() * 0.2 + 0.1}`,
-      delay: `${Math.random() * 30}s`,
-      duration: 'animate-snow-fall-slow',
-      blur: `${Math.random() * 4 + 2}px`
+      size: `${Math.random() * (sizeRange[1] - sizeRange[0]) + sizeRange[0]}px`,
+      opacity: `${
+        Math.random() * (opacityRange[1] - opacityRange[0]) + opacityRange[0]
+      }`,
+      delay: `${Math.random() * 20}s`,
+      duration: speedClass,
+      blur:
+        Math.random() < blurChance ? `${Math.random() * 2 + 1}px` : undefined,
     }));
-  }, [snowflakeCount, isMoving]);
+
+  const foreground = useMemo(
+    () =>
+      generateSnowflakes(
+        Math.floor(snowflakeCount * 0.5),
+        "animate-snow-fall-fast",
+        [2, 6],
+        [0.6, 1],
+        0.2
+      ),
+    [snowflakeCount]
+  );
+
+  const midground = useMemo(
+    () =>
+      generateSnowflakes(
+        Math.floor(snowflakeCount * 0.3),
+        "animate-snow-fall-medium",
+        [4, 10],
+        [0.4, 0.8],
+        0.4
+      ),
+    [snowflakeCount]
+  );
+
+  const background = useMemo(
+    () =>
+      generateSnowflakes(
+        Math.floor(snowflakeCount * 0.2),
+        "animate-snow-fall-slow",
+        [10, 20],
+        [0.2, 0.4],
+        0.8
+      ),
+    [snowflakeCount]
+  );
+
+  const allFlakes = [...background, ...midground, ...foreground];
 
   return (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none">
-      {/* Background snowflakes (larger, blurred) */}
-      {backgroundSnowflakes.map((snowflake) => (
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+      {allFlakes.map((flake) => (
         <Snowflake
-          key={snowflake.id}
-          left={snowflake.left}
-          size={snowflake.size}
-          opacity={snowflake.opacity}
-          delay={snowflake.delay}
-          duration={snowflake.duration}
-          blur={snowflake.blur}
-        />
-      ))}
-      
-      {/* Foreground snowflakes */}
-      {snowflakes.map((snowflake) => (
-        <Snowflake
-          key={snowflake.id}
-          left={snowflake.left}
-          size={snowflake.size}
-          opacity={snowflake.opacity}
-          delay={snowflake.delay}
-          duration={snowflake.duration}
-          blur={snowflake.blur}
+          key={flake.id}
+          left={flake.left}
+          size={flake.size}
+          opacity={flake.opacity}
+          delay={flake.delay}
+          duration={flake.duration}
+          blur={flake.blur}
         />
       ))}
     </div>

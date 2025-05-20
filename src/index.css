@@ -96,6 +96,26 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground bg-[#75c8ee] overflow-x-hidden;
   }
+}
+
+.main-background {
+  background: url("../../img.jpg");
+  background-attachment: fixed;
+}
+.text-h {
+  background-image: linear-gradient(
+    260deg,
+    hsl(0, 0%, 100%) 20%,
+    hsl(190, 100%, 48%) 31%,
+    hsl(0, 0%, 100%) 70%
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  mask-image: linear-gradient(to bottom right,black 30%, transparent);
+  transform: translate(0, 1vw);
+  width: fit-content;
+  margin: auto;
 }

@@ -33,7 +33,8 @@ export const AudioEffects: React.FC<AudioEffectsProps> = ({
     
     // Play a subtle wind effect to confirm audio is working
     if (effectRef.current) {
-      effectRef.current.src = '/sounds/wind-light.mp3';
+      effectRef.current.src =
+        "https://youtu.be/5jlUVr6gkos?si=WtK2hQLjMR-e24cc";
       effectRef.current.volume = 0.2;
       effectRef.current.play().catch(err => console.log('Effect playback prevented:', err));
     }
@@ -61,20 +62,20 @@ export const AudioEffects: React.FC<AudioEffectsProps> = ({
   useEffect(() => {
     if (!ambientRef.current || muted) return;
     
-    let soundFile = '/sounds/wind-light.mp3';
+    let soundFile = "https://youtu.be/5jlUVr6gkos?si=WtK2hQLjMR-e24cc";
     let volume = 0.3;
     
     switch (snowIntensity) {
       case 'heavy':
-        soundFile = '/sounds/blizzard.mp3';
+        soundFile = "https://youtu.be/5jlUVr6gkos?si=WtK2hQLjMR-e24cc";
         volume = 0.4;
         break;
       case 'medium':
-        soundFile = '/sounds/wind-medium.mp3';
+        soundFile = "https://youtu.be/5jlUVr6gkos?si=WtK2hQLjMR-e24cc";
         volume = 0.3;
         break;
       case 'light':
-        soundFile = '/sounds/wind-light.mp3';
+        soundFile = "https://youtu.be/5jlUVr6gkos?si=WtK2hQLjMR-e24cc";
         volume = 0.2;
         break;
     }
@@ -97,23 +98,23 @@ export const AudioEffects: React.FC<AudioEffectsProps> = ({
     
     switch (riskLevel) {
       case 'extreme':
-        soundFile = '/sounds/avalanche.mp3';
+        soundFile = "https://youtu.be/5jlUVr6gkos?si=WtK2hQLjMR-e24cc";
         volume = 0.5;
         break;
       case 'high':
-        soundFile = '/sounds/cracking-ice.mp3';
+        soundFile = "https://youtu.be/5jlUVr6gkos?si=WtK2hQLjMR-e24cc";
         volume = 0.45;
         break;
       case 'considerable':
-        soundFile = '/sounds/snow-movement.mp3';
+        soundFile = "https://youtu.be/5jlUVr6gkos?si=WtK2hQLjMR-e24cc";
         volume = 0.4;
         break;
       case 'moderate':
-        soundFile = '/sounds/soft-snow.mp3';
+        soundFile = "https://youtu.be/5jlUVr6gkos?si=WtK2hQLjMR-e24cc";
         volume = 0.35;
         break;
       case 'low':
-        soundFile = '/sounds/gentle-wind.mp3';
+        soundFile = "https://youtu.be/5jlUVr6gkos?si=WtK2hQLjMR-e24cc";
         volume = 0.3;
         break;
     }
