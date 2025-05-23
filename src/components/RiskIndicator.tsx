@@ -75,7 +75,7 @@ export const RiskIndicator: React.FC<RiskIndicatorProps> = ({
     : '';
 
   return (
-    <div className={cn("flex items-center gap-2 !bg-transparent", className)}>
+    <div className={cn("flex items-center gap-2 !bg-transparent", className)} data-region="global">
       <div className={cn(
         "rounded-full flex items-center justify-center", 
         sizeClasses[size], 

@@ -22,12 +22,49 @@ export const fetchLocations = async (): Promise<Location[]> => {
     const data = await response.json();
 
     // Transform the API response to match our Location interface
-    return data.features.map((feature: any) => ({
+    const apiLocations = data.features.map((feature: any) => ({
       id: feature.id || String(feature.properties.id),
       name: feature.properties.name,
       region: feature.properties.center_name || feature.properties.state,
       country: feature.properties.state ? "USA" : "Unknown", // Most data from this API is US-based
     }));
+
+    // Add Indian snow regions
+    const indianSnowRegions = [
+      {
+        id: "KASHMIR",
+        name: "Kashmir",
+        region: "Himalayas",
+        country: "India",
+      },
+      {
+        id: "HIMACHAL",
+        name: "Himachal Pradesh",
+        region: "Himalayas",
+        country: "India",
+      },
+      {
+        id: "UTTARAKHAND",
+        name: "Uttarakhand",
+        region: "Himalayas",
+        country: "India",
+      },
+      {
+        id: "SIKKIM",
+        name: "Sikkim",
+        region: "Eastern Himalayas",
+        country: "India",
+      },
+      {
+        id: "ARUNACHAL",
+        name: "Arunachal Pradesh",
+        region: "Eastern Himalayas",
+        country: "India",
+      },
+    ];
+
+    // Combine API locations with Indian locations
+    return [...apiLocations, ...indianSnowRegions];
   } catch (error) {
     console.error("Error fetching locations:", error);
     // Return some fallback locations in case the API fails
@@ -47,6 +84,37 @@ export const fetchLocations = async (): Promise<Location[]> => {
       { id: "CBAC", name: "Crested Butte", region: "Colorado", country: "USA" },
       { id: "FAC", name: "Flathead", region: "Montana", country: "USA" },
       { id: "GNFAC", name: "Gallatin", region: "Montana", country: "USA" },
+      // Indian snow regions
+      {
+        id: "KASHMIR",
+        name: "Kashmir",
+        region: "Himalayas",
+        country: "India",
+      },
+      {
+        id: "HIMACHAL",
+        name: "Himachal Pradesh",
+        region: "Himalayas",
+        country: "India",
+      },
+      {
+        id: "UTTARAKHAND",
+        name: "Uttarakhand",
+        region: "Himalayas",
+        country: "India",
+      },
+      {
+        id: "SIKKIM",
+        name: "Sikkim",
+        region: "Eastern Himalayas",
+        country: "India",
+      },
+      {
+        id: "ARUNACHAL",
+        name: "Arunachal Pradesh",
+        region: "Eastern Himalayas",
+        country: "India",
+      },
     ];
   }
 };
