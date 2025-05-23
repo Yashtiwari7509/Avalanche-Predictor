@@ -205,37 +205,93 @@ export const fetchPrediction = async (
   }
 };
 
+// Check if a location is an Indian snow region
+const isIndianLocation = (locationId: string): boolean => {
+  const indianLocationIds = ["KASHMIR", "HIMACHAL", "UTTARAKHAND", "SIKKIM", "ARUNACHAL"];
+  return indianLocationIds.includes(locationId);
+};
+
+// Get Indian location data by ID
+const getIndianLocationById = (locationId: string): Location | undefined => {
+  const indianLocations = [
+    {
+      id: "KASHMIR",
+      name: "Kashmir",
+      region: "Himalayas",
+      country: "India",
+    },
+    {
+      id: "HIMACHAL",
+      name: "Himachal Pradesh",
+      region: "Himalayas",
+      country: "India",
+    },
+    {
+      id: "UTTARAKHAND",
+      name: "Uttarakhand",
+      region: "Himalayas",
+      country: "India",
+    },
+    {
+      id: "SIKKIM",
+      name: "Sikkim",
+      region: "Eastern Himalayas",
+      country: "India",
+    },
+    {
+      id: "ARUNACHAL",
+      name: "Arunachal Pradesh",
+      region: "Eastern Himalayas",
+      country: "India",
+    },
+  ];
+  
+  return indianLocations.find(loc => loc.id === locationId);
+};
+
 export const getPredictionFromInputs = async (
   formData: AvalancheFormData
 ): Promise<AvalanchePrediction | null> => {
   try {
-    // First get the location data
-    const locationsResponse = await fetch(
-      `${API_BASE_URL}/public/products/map-layer`
-    );
+    let location: Location;
+    
+    // Handle Indian locations differently
+    if (isIndianLocation(formData.locationId)) {
+      const indianLocation = getIndianLocationById(formData.locationId);
+      if (!indianLocation) {
+        throw new Error("Indian location not found");
+      }
+      location = indianLocation;
+    } else {
+      // Original flow for non-Indian locations
+      // First get the location data from the API
+      const locationsResponse = await fetch(
+        `${API_BASE_URL}/public/products/map-layer`
+      );
 
-    if (!locationsResponse.ok) {
-      throw new Error("Failed to fetch locations");
+      if (!locationsResponse.ok) {
+        throw new Error("Failed to fetch locations");
+      }
+
+      const locationsData = await locationsResponse.json();
+      const locationFeature = locationsData.features.find(
+        (feature: any) => String(feature.id) === String(formData.locationId)
+      );
+
+      if (!locationFeature) {
+        throw new Error("Location not found");
+      }
+
+      // Create location object
+      location = {
+        id: formData.locationId,
+        name: locationFeature.properties.name,
+        region:
+          locationFeature.properties.center_name ||
+          locationFeature.properties.state,
+        country: locationFeature.properties.state ? "USA" : "Unknown",
+      };
     }
-
-    const locationsData = await locationsResponse.json();
-    const locationFeature = locationsData.features.find(
-      (feature: any) => String(feature.id) === String(formData.locationId)
-    );
-
-    if (!locationFeature) {
-      throw new Error("Location not found");
-    }
-
-    // Create location object
-    const location: Location = {
-      id: formData.locationId,
-      name: locationFeature.properties.name,
-      region:
-        locationFeature.properties.center_name ||
-        locationFeature.properties.state,
-      country: locationFeature.properties.state ? "USA" : "Unknown",
-    };
 
     // Calculate risk level based on input parameters
     const riskLevel = calculateRiskFromInputs(formData);
@@ -251,9 +307,7 @@ export const getPredictionFromInputs = async (
         windSpeed: formData.windSpeed,
         windDirection: "Variable", // Not specified in form
         visibility: formData.visibility,
-        forecast:
-          locationFeature.properties.travel_advice ||
-          "Check local conditions before heading out.",
+        forecast: "Check local conditions before heading out.",
       },
       snowpack: {
         depth: 100, // Default value
